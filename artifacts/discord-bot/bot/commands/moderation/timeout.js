@@ -16,15 +16,15 @@ module.exports = {
     const durationStr = interaction.options.getString('duration');
     const reason = interaction.options.getString('reason') || 'No reason provided';
 
-    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], ephemeral: true });
-    if (!target.moderatable) return interaction.reply({ embeds: [errorEmbed('I cannot timeout this member.')], ephemeral: true });
+    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], flags: 64 });
+    if (!target.moderatable) return interaction.reply({ embeds: [errorEmbed('I cannot timeout this member.')], flags: 64 });
 
     const durationMs = parseDuration(durationStr);
-    if (!durationMs) return interaction.reply({ embeds: [errorEmbed('Invalid duration. Use format: `10s`, `5m`, `2h`, `1d`.')], ephemeral: true });
+    if (!durationMs) return interaction.reply({ embeds: [errorEmbed('Invalid duration. Use format: `10s`, `5m`, `2h`, `1d`.')], flags: 64 });
 
     // Max 28 days
     if (durationMs > 28 * 24 * 3600 * 1000) {
-      return interaction.reply({ embeds: [errorEmbed('Maximum timeout duration is 28 days.')], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed('Maximum timeout duration is 28 days.')], flags: 64 });
     }
 
     await target.timeout(durationMs, reason);

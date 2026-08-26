@@ -34,7 +34,7 @@ module.exports = {
         .setDescription('Show all configured level rewards.')),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
 
     const sub = interaction.options.getSubcommand();
     const guildId = interaction.guild.id;

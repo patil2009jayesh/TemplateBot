@@ -15,8 +15,8 @@ module.exports = {
     const target = interaction.options.getMember('user');
     const reason = interaction.options.getString('reason');
 
-    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], ephemeral: true });
-    if (target.user.bot) return interaction.reply({ embeds: [errorEmbed('Cannot warn a bot.')], ephemeral: true });
+    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], flags: 64 });
+    if (target.user.bot) return interaction.reply({ embeds: [errorEmbed('Cannot warn a bot.')], flags: 64 });
 
     await addWarning(target.id, interaction.guild.id, interaction.user.id, reason);
     const count = await getWarningCount(target.id, interaction.guild.id);

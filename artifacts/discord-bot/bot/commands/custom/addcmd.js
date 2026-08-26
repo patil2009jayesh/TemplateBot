@@ -17,7 +17,7 @@ module.exports = {
     // Prevent overriding built-in commands
     const builtIn = interaction.client.commands.has(name);
     if (builtIn) {
-      return interaction.reply({ embeds: [errorEmbed(`\`${name}\` is a built-in command and cannot be overridden.`)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed(`\`${name}\` is a built-in command and cannot be overridden.`)], flags: 64 });
     }
 
     try {
@@ -25,7 +25,7 @@ module.exports = {
       await interaction.reply({ embeds: [successEmbed(`Custom command \`/${name}\` created!\n**Response:** ${response}`)] });
     } catch (err) {
       if (err.code === '23505') {
-        return interaction.reply({ embeds: [errorEmbed(`Command \`/${name}\` already exists. Delete it first with \`/delcmd\`.`)], ephemeral: true });
+        return interaction.reply({ embeds: [errorEmbed(`Command \`/${name}\` already exists. Delete it first with \`/delcmd\`.`)], flags: 64 });
       }
       throw err;
     }

@@ -17,9 +17,9 @@ module.exports = {
     const reason = interaction.options.getString('reason') || 'No reason provided';
     const deleteDays = interaction.options.getInteger('delete_days') ?? 0;
 
-    if (!target) return interaction.reply({ embeds: [errorEmbed('User not found.')], ephemeral: true });
-    if (member && !member.bannable) return interaction.reply({ embeds: [errorEmbed('I cannot ban this member.')], ephemeral: true });
-    if (target.id === interaction.user.id) return interaction.reply({ embeds: [errorEmbed('You cannot ban yourself.')], ephemeral: true });
+    if (!target) return interaction.reply({ embeds: [errorEmbed('User not found.')], flags: 64 });
+    if (member && !member.bannable) return interaction.reply({ embeds: [errorEmbed('I cannot ban this member.')], flags: 64 });
+    if (target.id === interaction.user.id) return interaction.reply({ embeds: [errorEmbed('You cannot ban yourself.')], flags: 64 });
 
     await interaction.guild.members.ban(target.id, { reason, deleteMessageSeconds: deleteDays * 86400 });
     await logModAction(interaction.guild, 'ban', target, interaction.member, reason);

@@ -51,9 +51,9 @@ module.exports = {
       `).run(sent.id, interaction.guild.id, interaction.channel.id, label, role.id, customId);
     } catch (error) {
       await sent.delete().catch(() => {});
-      return interaction.reply({ embeds: [errorEmbed('Database error: ' + error.message)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed('Database error: ' + error.message)], flags: 64 });
     }
 
-    await interaction.reply({ embeds: [successEmbed(`Button role message created for **${role.name}**.`)], ephemeral: true });
+    await interaction.reply({ embeds: [successEmbed(`Button role message created for **${role.name}**.`)], flags: 64 });
   },
 };

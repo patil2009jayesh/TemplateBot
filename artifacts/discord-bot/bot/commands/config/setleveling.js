@@ -46,7 +46,7 @@ module.exports = {
     if (sub === 'xprange') {
       const min = interaction.options.getInteger('min');
       const max = interaction.options.getInteger('max');
-      if (min > max) return interaction.reply({ content: 'Min must be less than max.', ephemeral: true });
+      if (min > max) return interaction.reply({ content: 'Min must be less than max.', flags: 64 });
       await updateGuildSetting(guildId, 'leveling', { xpMin: min, xpMax: max });
       return interaction.reply({ embeds: [successEmbed(`XP range set to **${min}–${max}** per message.`)] });
     }

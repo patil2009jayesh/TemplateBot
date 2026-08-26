@@ -24,13 +24,13 @@ module.exports = {
       if (!enabled) {
         return interaction.reply({
           embeds: [errorEmbed('The AFK module is disabled on this server.')],
-          ephemeral: true,
+          flags: 64,
         });
       }
     } catch {
       return interaction.reply({
         embeds: [errorEmbed('Could not check module status. Make sure the database tables are set up.')],
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -44,7 +44,7 @@ module.exports = {
       } catch (err) {
         return interaction.reply({
           embeds: [errorEmbed(`Database error: ${err.message}`)],
-          ephemeral: true,
+          flags: 64,
         });
       }
 
@@ -54,7 +54,7 @@ module.exports = {
         } catch (err) {
           return interaction.reply({
             embeds: [errorEmbed(`Failed to remove AFK: ${err.message}`)],
-            ephemeral: true,
+            flags: 64,
           });
         }
 
@@ -79,7 +79,7 @@ module.exports = {
               `**Remove AFK:** \`/afk\` (no reason) or just send any message`
             ),
         ],
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -89,7 +89,7 @@ module.exports = {
     } catch (err) {
       return interaction.reply({
         embeds: [errorEmbed(`Failed to set AFK: ${err.message}\n\nMake sure the database schema is set up (run schema.sql in Supabase).`)],
-        ephemeral: true,
+        flags: 64,
       });
     }
 

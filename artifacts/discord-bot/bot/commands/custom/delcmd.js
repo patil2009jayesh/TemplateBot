@@ -14,7 +14,7 @@ module.exports = {
 
     const existing = await getCustomCommand(interaction.guild.id, name);
     if (!existing) {
-      return interaction.reply({ embeds: [errorEmbed(`Command \`/${name}\` does not exist.`)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed(`Command \`/${name}\` does not exist.`)], flags: 64 });
     }
 
     await deleteCustomCommand(interaction.guild.id, name);

@@ -20,7 +20,7 @@ module.exports = {
     const moduleName = interaction.options.getString('name');
 
     if (!MODULES.includes(moduleName)) {
-      return interaction.reply({ embeds: [errorEmbed(`Unknown module: \`${moduleName}\``)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed(`Unknown module: \`${moduleName}\``)], flags: 64 });
     }
 
     const newState = await toggleModule(interaction.guild.id, moduleName);

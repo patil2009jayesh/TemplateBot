@@ -48,10 +48,10 @@ module.exports = {
 
     if (sub === 'list-teams') {
       const teams = db.prepare('SELECT * FROM ticket_teams WHERE guild_id = ?').all(interaction.guildId);
-      if (!teams.length) return interaction.reply({ content: '❌ No ticket teams found. Create one with `/ticket setup-team`.', ephemeral: true });
+      if (!teams.length) return interaction.reply({ content: '❌ No ticket teams found. Create one with `/ticket setup-team`.', flags: 64 });
 
       const list = teams.map(t => `ID: **${t.id}** | Name: **${t.team_name}** | Staff Role: <@&${t.staff_role_id}>`).join('\n');
-      interaction.reply({ content: `**Support Teams:**\n${list}`, ephemeral: true });
+      interaction.reply({ content: `**Support Teams:**\n${list}`, flags: 64 });
     }
   },
 };

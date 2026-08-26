@@ -26,7 +26,7 @@ module.exports = {
     const channel = interaction.options.getChannel('channel');
 
     if (!CHANNEL_KEYS.includes(type)) {
-      return interaction.reply({ embeds: [errorEmbed(`Unknown channel type: \`${type}\``)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed(`Unknown channel type: \`${type}\``)], flags: 64 });
     }
 
     await updateGuildField(interaction.guild.id, 'channels', { [type]: channel ? channel.id : null });

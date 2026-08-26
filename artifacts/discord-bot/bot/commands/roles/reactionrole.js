@@ -20,11 +20,11 @@ module.exports = {
 
     // Verify message exists
     const msg = await channel.messages.fetch(messageId).catch(() => null);
-    if (!msg) return interaction.reply({ embeds: [errorEmbed('Message not found in that channel.')], ephemeral: true });
+    if (!msg) return interaction.reply({ embeds: [errorEmbed('Message not found in that channel.')], flags: 64 });
 
     // Add reaction to the message
     await msg.react(emoji).catch(() => {
-      return interaction.reply({ embeds: [errorEmbed('Invalid emoji or I cannot use it.')], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed('Invalid emoji or I cannot use it.')], flags: 64 });
     });
 
     // Save to DB
@@ -37,7 +37,7 @@ module.exports = {
           role_id = excluded.role_id
       `).run(messageId, interaction.guild.id, channel.id, emoji, role.id);
     } catch (error) {
-      return interaction.reply({ embeds: [errorEmbed('Database error: ' + error.message)], ephemeral: true });
+      return interaction.reply({ embeds: [errorEmbed('Database error: ' + error.message)], flags: 64 });
     }
 
     await interaction.reply({

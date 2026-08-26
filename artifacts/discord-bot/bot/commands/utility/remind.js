@@ -14,7 +14,7 @@ module.exports = {
     const message = interaction.options.getString('message');
 
     const ms = parseDuration(durationStr);
-    if (!ms) return interaction.reply({ embeds: [errorEmbed('Invalid duration. Use: `10s`, `5m`, `2h`, `1d`.')], ephemeral: true });
+    if (!ms) return interaction.reply({ embeds: [errorEmbed('Invalid duration. Use: `10s`, `5m`, `2h`, `1d`.')], flags: 64 });
 
     const remindAt = new Date(Date.now() + ms).toISOString();
 

@@ -14,9 +14,9 @@ module.exports = {
     const target = interaction.options.getMember('user');
     const reason = interaction.options.getString('reason') || 'No reason provided';
 
-    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], ephemeral: true });
-    if (!target.kickable) return interaction.reply({ embeds: [errorEmbed('I cannot kick this member.')], ephemeral: true });
-    if (target.id === interaction.user.id) return interaction.reply({ embeds: [errorEmbed('You cannot kick yourself.')], ephemeral: true });
+    if (!target) return interaction.reply({ embeds: [errorEmbed('Member not found.')], flags: 64 });
+    if (!target.kickable) return interaction.reply({ embeds: [errorEmbed('I cannot kick this member.')], flags: 64 });
+    if (target.id === interaction.user.id) return interaction.reply({ embeds: [errorEmbed('You cannot kick yourself.')], flags: 64 });
 
     await target.kick(reason);
     await logModAction(interaction.guild, 'kick', target, interaction.member, reason);

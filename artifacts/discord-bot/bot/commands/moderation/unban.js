@@ -23,7 +23,7 @@ module.exports = {
         embeds: [successEmbed(`**${ban.user.tag}** has been unbanned.\n**Reason:** ${reason}`)],
       });
     } catch {
-      await interaction.reply({ embeds: [errorEmbed('User is not banned or invalid ID.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('User is not banned or invalid ID.')], flags: 64 });
     }
   },
 };

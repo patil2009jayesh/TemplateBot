@@ -17,7 +17,7 @@ module.exports = {
     if (raw) {
       options = raw.split('|').map(s => s.trim()).filter(Boolean).slice(0, 10);
       if (options.length < 2) {
-        return interaction.reply({ content: 'Please provide at least 2 options separated by `|`.', ephemeral: true });
+        return interaction.reply({ content: 'Please provide at least 2 options separated by `|`.', flags: 64 });
       }
     } else {
       options = ['Yes', 'No'];

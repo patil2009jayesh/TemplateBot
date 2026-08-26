@@ -37,7 +37,7 @@ module.exports = {
       // Parse duration
       const durationMs = parseDuration(durationStr);
       if (!durationMs) {
-        return interaction.reply({ content: '❌ Invalid duration format! Use 10m, 1h, 1d, etc.', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid duration format! Use 10m, 1h, 1d, etc.', flags: 64 });
       }
 
       await startGiveaway(interaction, type, prize, durationMs, winners, minInvites);
