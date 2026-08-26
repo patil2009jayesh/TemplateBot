@@ -13,5 +13,6 @@ node_modules/
 
 # Logs & OS Files
 *.log
+*.zip
 .DS_Store
 Thumbs.db
