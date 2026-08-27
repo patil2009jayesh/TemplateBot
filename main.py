@@ -58,7 +58,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("TachosDev")
 
-# Default safe intents that connect on any Discord bot without requiring verification
 intents = discord.Intents.default()
 try:
     intents.message_content = True
@@ -100,7 +99,6 @@ class TachosDevBot(commands.Bot):
             Path.cwd(),
             Path.cwd() / "cogs"
         ]
-        # Search for any subfolder named 'cogs'
         for root_p in [BASE_DIR, Path("/home/container"), Path.cwd()]:
             if root_p.exists():
                 for sub in root_p.glob("**/cogs"):
@@ -113,19 +111,16 @@ class TachosDevBot(commands.Bot):
 
         logger.info(f"Current container files: {[f.name for f in BASE_DIR.iterdir()] if BASE_DIR.exists() else 'N/A'}")
 
-        # Load all cogs dynamically
+        # Load all cogs
         import importlib
         for cog_name in COGS_LIST:
             loaded = False
-            # Try 1: standard load_extension
             try:
                 await self.load_extension(cog_name)
                 logger.info(f"Loaded Cog: {cog_name}")
                 loaded = True
             except Exception as e1:
-                # Try 2: direct module import and setup
                 try:
-                    short_name = cog_name.split(".")[-1]
                     mod = importlib.import_module(cog_name)
                     if hasattr(mod, "setup"):
                         await mod.setup(self)
@@ -133,7 +128,7 @@ class TachosDevBot(commands.Bot):
                         loaded = True
                 except Exception as e2:
                     try:
-                        # Try 3: fallback short name
+                        short_name = cog_name.split(".")[-1]
                         mod = importlib.import_module(short_name)
                         if hasattr(mod, "setup"):
                             await mod.setup(self)
@@ -142,55 +137,47 @@ class TachosDevBot(commands.Bot):
                     except Exception as e3:
                         logger.error(f"Failed to load cog {cog_name}: {e1} | {e2} | {e3}")
 
-        # Sync application slash commands globally
-        logger.info("Syncing slash commands globally with Discord...")
+        # ── ONE global sync only ──
+        # DO NOT also sync per-guild in on_ready — that causes every command
+        # to appear twice in Discord's slash menu.
+        logger.info("Syncing slash commands globally with Discord (this may take up to 1 hour to propagate)...")
         try:
             synced = await self.tree.sync()
-            logger.info(f"Successfully synced {len(synced)} slash command(s) globally!")
+            logger.info(f"Successfully synced {len(synced)} global slash command(s).")
         except Exception as e:
             logger.error(f"Failed to sync slash commands: {e}")
 
     async def on_ready(self):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
         logger.info(f"Serving {len(self.guilds)} guild(s) with {len(self.users)} cached members.")
+        # NOTE: Do NOT call tree.sync(guild=...) here.
+        # That registers guild-specific duplicates of every global command.
 
-        # Sync commands instantly to every connected guild for immediate visibility
-        for guild in self.guilds:
-            try:
-                self.tree.copy_global_to(guild=guild)
-                await self.tree.sync(guild=guild)
-                logger.info(f"Instant command sync active on: {guild.name} ({guild.id})")
-            except Exception as e:
-                logger.warning(f"Could not instant-sync to {guild.name}: {e}")
-
-        activity = discord.Activity(type=discord.ActivityType.watching, name="Tachos Dev | /help")
+        activity = discord.Activity(type=discord.ActivityType.watching, name="Axquen Server | /help")
         await self.change_presence(activity=activity, status=discord.Status.online)
         logger.info("Tachos Dev presence initialized.")
 
     async def on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         if isinstance(error, discord.app_commands.MissingPermissions):
             perms = ", ".join(error.missing_permissions)
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ You are missing required permissions: `{perms}`.", ephemeral=True)
-            else:
-                await interaction.followup.send(f"❌ You are missing required permissions: `{perms}`.", ephemeral=True)
+            msg = f"❌ You are missing required permissions: `{perms}`."
         elif isinstance(error, discord.app_commands.BotMissingPermissions):
             perms = ", ".join(error.missing_permissions)
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ I am missing required bot permissions: `{perms}`.", ephemeral=True)
-            else:
-                await interaction.followup.send(f"❌ I am missing required bot permissions: `{perms}`.", ephemeral=True)
+            msg = f"❌ I am missing required bot permissions: `{perms}`."
         else:
             logger.error(f"Command error in {interaction.command}: {error}", exc_info=True)
-            msg = f"❌ An error occurred while executing this command: {str(error)}"
+            msg = f"❌ An error occurred: {str(error)}"
+
+        try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(msg, ephemeral=True)
             else:
                 await interaction.followup.send(msg, ephemeral=True)
+        except Exception:
+            pass
 
 async def run_bot():
     global bot
-    # First attempt with configured intents
     bot = TachosDevBot(intents)
     bot.tree.on_error = bot.on_tree_error
     try:

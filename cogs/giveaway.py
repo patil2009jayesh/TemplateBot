@@ -15,14 +15,16 @@ from utils.helpers import success_embed, error_embed, info_embed
 from utils.time_parser import parse_duration, format_duration
 
 class GiveawayView(discord.ui.View):
+    """Persistent view — button interaction is handled by GiveawayCog.on_interaction only."""
     def __init__(self, giveaway_id: int):
         super().__init__(timeout=None)
-        self.giveaway_id = giveaway_id
-        self.enter_btn.custom_id = f"gw_enter:{giveaway_id}"
-
-    @discord.ui.button(label="Enter Giveaway", style=discord.ButtonStyle.primary, emoji="🎉")
-    async def enter_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_giveaway_entry(interaction, self.giveaway_id)
+        btn = discord.ui.Button(
+            label="Enter Giveaway",
+            style=discord.ButtonStyle.primary,
+            emoji="🎉",
+            custom_id=f"gw_enter:{giveaway_id}"
+        )
+        self.add_item(btn)
 
 async def handle_giveaway_entry(interaction: discord.Interaction, giveaway_id: int):
     async with get_db() as db:

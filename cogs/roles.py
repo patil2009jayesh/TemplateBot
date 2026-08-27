@@ -108,7 +108,7 @@ class RolesCog(commands.Cog, name="roles"):
             "danger": discord.ButtonStyle.danger
         }
         style = style_map.get(color, discord.ButtonStyle.primary)
-        custom_id = f"btn_role_{role.id}"
+        custom_id = f"btn_role:{role.id}"
 
         embed = discord.Embed(
             title="🎭 Role Assignment",
