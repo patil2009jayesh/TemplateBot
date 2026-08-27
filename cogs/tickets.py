@@ -35,12 +35,21 @@ class TicketModal(discord.ui.Modal, title="Create Support Ticket"):
         guild = interaction.guild
 
         # Fetch team config
+        cat_id = None
+        staff_id = None
         async with get_db() as db:
             async with db.execute("SELECT * FROM ticket_teams WHERE id = ?", (self.team_id,)) as cursor:
                 team = await cursor.fetchone()
+                if team:
+                    try:
+                        cat_id = team["category_id"]
+                        staff_id = team["staff_role_id"]
+                    except (TypeError, KeyError, IndexError):
+                        staff_id = team[3] if len(team) > 3 else None
+                        cat_id = team[4] if len(team) > 4 else None
 
-        category = guild.get_channel(int(team["category_id"])) if team and team["category_id"] else None
-        staff_role = guild.get_role(int(team["staff_role_id"])) if team and team["staff_role_id"] else None
+        category = guild.get_channel(int(cat_id)) if cat_id else None
+        staff_role = guild.get_role(int(staff_id)) if staff_id else None
 
         # Permissions: Creator + Staff + Bot
         overwrites = {
@@ -52,7 +61,8 @@ class TicketModal(discord.ui.Modal, title="Create Support Ticket"):
             overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
         try:
-            channel_name = f"ticket-{interaction.user.name[:12]}-{interaction.user.discriminator if interaction.user.discriminator != '0' else interaction.user.id[-4:]}"
+            user_suffix = interaction.user.discriminator if (interaction.user.discriminator and interaction.user.discriminator != '0') else str(interaction.user.id)[-4:]
+            channel_name = f"ticket-{interaction.user.name[:12]}-{user_suffix}"
             ticket_ch = await guild.create_text_channel(
                 name=channel_name,
                 category=category,
@@ -169,12 +179,17 @@ class TicketsCog(commands.GroupCog, name="ticket"):
         if not team:
             return await interaction.response.send_message(embed=error_embed("Invalid Team ID. Create one with `/ticket setup-team` first."), ephemeral=True)
 
+        try:
+            team_name = team["team_name"]
+        except (TypeError, KeyError, IndexError):
+            team_name = team[2] if len(team) > 2 else "Support"
+
         embed = discord.Embed(
             title=title,
             description=description,
             color=discord.Color.blurple()
         )
-        embed.set_footer(text=f"Team: {team['team_name']} • Tachos Dev Tickets")
+        embed.set_footer(text=f"Team: {team_name} • Tachos Dev Tickets")
 
         view = TicketPanelButton(team_id)
         await interaction.channel.send(embed=embed, view=view)
