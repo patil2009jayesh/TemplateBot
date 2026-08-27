@@ -95,6 +95,15 @@ class TachosDevBot(commands.Bot):
         logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
         logger.info(f"Serving {len(self.guilds)} guild(s) with {len(self.users)} cached members.")
 
+        # Sync commands instantly to every connected guild for immediate visibility
+        for guild in self.guilds:
+            try:
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                logger.info(f"Instant command sync active on: {guild.name} ({guild.id})")
+            except Exception as e:
+                logger.warning(f"Could not instant-sync to {guild.name}: {e}")
+
         activity = discord.Activity(type=discord.ActivityType.watching, name="Tachos Dev | /help")
         await self.change_presence(activity=activity, status=discord.Status.online)
         logger.info("Tachos Dev presence initialized.")
