@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-DB_PATH = Path(__file__).parent.parent / "bot.sqlite"
+# BOT_DB env var lets each bot instance use its own database file
+_db_name = os.getenv("BOT_DB", "bot.sqlite")
+DB_PATH = Path(__file__).parent.parent / _db_name
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS guilds (

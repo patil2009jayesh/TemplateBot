@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).parent.resolve()
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-DB_PATH = BASE_DIR / "bot.sqlite"
+DB_PATH = BASE_DIR / os.getenv("BOT_DB", "bot.sqlite")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS guilds (
