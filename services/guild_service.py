@@ -1,5 +1,12 @@
 import json
-from database.connection import get_db
+try:
+    from database.connection import get_db
+except ModuleNotFoundError:
+    try:
+        from database import get_db
+    except ModuleNotFoundError:
+        import database
+        get_db = database.get_db
 
 DEFAULT_MODULES = {
     "moderation": True,

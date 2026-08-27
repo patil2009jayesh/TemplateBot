@@ -1,4 +1,11 @@
-from database.connection import get_db
+try:
+    from database.connection import get_db
+except ModuleNotFoundError:
+    try:
+        from database import get_db
+    except ModuleNotFoundError:
+        import database
+        get_db = database.get_db
 
 async def get_custom_command(guild_id: str | int, name: str) -> dict | None:
     gid = str(guild_id)

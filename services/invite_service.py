@@ -1,4 +1,11 @@
-from database.connection import get_db
+try:
+    from database.connection import get_db
+except ModuleNotFoundError:
+    try:
+        from database import get_db
+    except ModuleNotFoundError:
+        import database
+        get_db = database.get_db
 
 async def get_user_invites(guild_id: str | int, user_id: str | int) -> dict:
     gid, uid = str(guild_id), str(user_id)

@@ -12,7 +12,14 @@ import logging
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
-from database.connection import init_db
+try:
+    from database.connection import init_db
+except ModuleNotFoundError:
+    try:
+        from database import init_db
+    except ModuleNotFoundError:
+        import database
+        init_db = database.init_db
 
 # Load environment variables
 load_dotenv()

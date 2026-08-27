@@ -1,5 +1,12 @@
 from datetime import datetime
-from database.connection import get_db
+try:
+    from database.connection import get_db
+except ModuleNotFoundError:
+    try:
+        from database import get_db
+    except ModuleNotFoundError:
+        import database
+        get_db = database.get_db
 
 async def add_warning(guild_id: str | int, user_id: str | int, moderator_id: str | int, reason: str, warn_type: str = "warn") -> int:
     gid, uid, mid = str(guild_id), str(user_id), str(moderator_id)

@@ -1,7 +1,14 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from database.connection import get_db
+try:
+    from database.connection import get_db
+except ModuleNotFoundError:
+    try:
+        from database import get_db
+    except ModuleNotFoundError:
+        import database
+        get_db = database.get_db
 from utils.helpers import success_embed, error_embed, info_embed
 
 class DynamicButtonRoleView(discord.ui.View):
