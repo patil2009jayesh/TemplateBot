@@ -4,14 +4,16 @@ from pathlib import Path
 
 # Ensure root directory is always in sys.path
 BASE_DIR = Path(__file__).parent.resolve()
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+for p in [str(BASE_DIR), str(Path.cwd()), "/home/container"]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 import asyncio
 import logging
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
+
 try:
     from database.connection import init_db
 except ModuleNotFoundError:
@@ -40,18 +42,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("TachosDev")
 
+# Default safe intents that connect on any Discord bot without requiring verification
 intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.guilds = True
-intents.voice_states = True
-intents.reactions = True
+try:
+    intents.message_content = True
+    intents.members = True
+except Exception:
+    pass
+
+COGS_LIST = [
+    "cogs.backup",
+    "cogs.moderation",
+    "cogs.config",
+    "cogs.leveling",
+    "cogs.giveaway",
+    "cogs.tickets",
+    "cogs.invites",
+    "cogs.roles",
+    "cogs.custom_commands",
+    "cogs.utility"
+]
 
 class TachosDevBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, bot_intents):
         super().__init__(
             command_prefix=commands.when_mentioned_or("!"),
-            intents=intents,
+            intents=bot_intents,
             help_command=None
         )
 
@@ -59,17 +75,13 @@ class TachosDevBot(commands.Bot):
         logger.info("Initializing SQLite database tables...")
         await init_db()
 
-        # Dynamically load all cogs from cogs/
-        cogs_dir = Path(__file__).parent / "cogs"
-        if cogs_dir.exists():
-            for file in cogs_dir.glob("*.py"):
-                if not file.name.startswith("_"):
-                    cog_name = f"cogs.{file.stem}"
-                    try:
-                        await self.load_extension(cog_name)
-                        logger.info(f"Loaded Cog: {cog_name}")
-                    except Exception as e:
-                        logger.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
+        # Load all 10 cogs explicitly
+        for cog_name in COGS_LIST:
+            try:
+                await self.load_extension(cog_name)
+                logger.info(f"Loaded Cog: {cog_name}")
+            except Exception as e:
+                logger.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
 
         # Sync application slash commands globally
         logger.info("Syncing slash commands globally with Discord...")
@@ -108,23 +120,27 @@ class TachosDevBot(commands.Bot):
             else:
                 await interaction.followup.send(msg, ephemeral=True)
 
-bot = TachosDevBot()
-bot.tree.on_error = bot.on_tree_error
-
-async def main():
+async def run_bot():
+    global bot
+    # First attempt with configured intents
+    bot = TachosDevBot(intents)
+    bot.tree.on_error = bot.on_tree_error
     try:
         async with bot:
             await bot.start(TOKEN)
     except discord.errors.PrivilegedIntentsRequired:
-        logger.warning("Privileged Intents are not enabled on Discord Developer Portal! Starting with basic intents fallback...")
-        bot.intents.message_content = False
-        bot.intents.members = False
-        bot.intents.presences = False
+        logger.warning("Privileged Intents not enabled on Discord Portal. Starting with basic default intents...")
+        safe_intents = discord.Intents.default()
+        bot = TachosDevBot(safe_intents)
+        bot.tree.on_error = bot.on_tree_error
         async with bot:
             await bot.start(TOKEN)
 
+def main():
+    asyncio.run(run_bot())
+
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Bot shutting down...")
