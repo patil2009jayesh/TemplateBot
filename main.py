@@ -75,13 +75,56 @@ class TachosDevBot(commands.Bot):
         logger.info("Initializing SQLite database tables...")
         await init_db()
 
-        # Load all 10 cogs explicitly
+        # Ensure all possible cog locations are in sys.path
+        possible_dirs = [
+            BASE_DIR,
+            BASE_DIR / "cogs",
+            Path("/home/container"),
+            Path("/home/container/cogs"),
+            Path.cwd(),
+            Path.cwd() / "cogs"
+        ]
+        # Search for any subfolder named 'cogs'
+        for root_p in [BASE_DIR, Path("/home/container"), Path.cwd()]:
+            if root_p.exists():
+                for sub in root_p.glob("**/cogs"):
+                    if sub.is_dir() and sub.parent not in possible_dirs:
+                        possible_dirs.insert(0, sub.parent)
+
+        for p in possible_dirs:
+            if p.exists() and str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+
+        logger.info(f"Current container files: {[f.name for f in BASE_DIR.iterdir()] if BASE_DIR.exists() else 'N/A'}")
+
+        # Load all cogs dynamically
+        import importlib
         for cog_name in COGS_LIST:
+            loaded = False
+            # Try 1: standard load_extension
             try:
                 await self.load_extension(cog_name)
                 logger.info(f"Loaded Cog: {cog_name}")
-            except Exception as e:
-                logger.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
+                loaded = True
+            except Exception as e1:
+                # Try 2: direct module import and setup
+                try:
+                    short_name = cog_name.split(".")[-1]
+                    mod = importlib.import_module(cog_name)
+                    if hasattr(mod, "setup"):
+                        await mod.setup(self)
+                        logger.info(f"Loaded Cog directly: {cog_name}")
+                        loaded = True
+                except Exception as e2:
+                    try:
+                        # Try 3: fallback short name
+                        mod = importlib.import_module(short_name)
+                        if hasattr(mod, "setup"):
+                            await mod.setup(self)
+                            logger.info(f"Loaded Cog short: {short_name}")
+                            loaded = True
+                    except Exception as e3:
+                        logger.error(f"Failed to load cog {cog_name}: {e1} | {e2} | {e3}")
 
         # Sync application slash commands globally
         logger.info("Syncing slash commands globally with Discord...")
