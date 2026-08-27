@@ -2,13 +2,14 @@ module.exports = {
   apps: [
     {
       name: 'tachos-dev',
-      script: 'index.js',
+      script: 'main.py',
+      interpreter: 'python3',
       instances: 1,
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production',
+        PYTHONUNBUFFERED: '1',
       },
     },
   ],

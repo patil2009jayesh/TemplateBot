@@ -7,9 +7,13 @@
 *.sqlite-shm
 backups/
 
-# Dependencies
-node_modules/
-.npm/
+# Python Cache & Dependencies
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+venv/
+.venv/
 
 # Logs & OS Files
 *.log
