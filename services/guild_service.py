@@ -52,7 +52,7 @@ async def get_guild(guild_id: str | int) -> dict:
             settings_json = json.dumps(DEFAULT_SETTINGS)
             
             await db.execute(
-                "INSERT INTO guilds (guild_id, modules, channels, roles, settings) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO guilds (guild_id, modules, channels, roles, settings) VALUES (?, ?, ?, ?, ?)",
                 (gid, modules_json, channels_json, roles_json, settings_json)
             )
             await db.commit()

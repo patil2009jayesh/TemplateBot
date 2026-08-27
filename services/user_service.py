@@ -29,7 +29,7 @@ async def get_user(user_id: str | int, guild_id: str | int) -> dict:
                 return dict(row)
             
             await db.execute(
-                "INSERT INTO users (user_id, guild_id, xp, level, afk) VALUES (?, ?, 0, 0, 0)",
+                "INSERT OR IGNORE INTO users (user_id, guild_id, xp, level, afk) VALUES (?, ?, 0, 0, 0)",
                 (uid, gid)
             )
             await db.commit()

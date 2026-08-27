@@ -12,7 +12,7 @@ async def get_user_invites(guild_id: str | int, user_id: str | int) -> dict:
             
             await db.execute(
                 """
-                INSERT INTO invites (guild_id, user_id, inviter_id, invites_count, fake_invites, left_invites)
+                INSERT OR IGNORE INTO invites (guild_id, user_id, inviter_id, invites_count, fake_invites, left_invites)
                 VALUES (?, ?, NULL, 0, 0, 0)
                 """,
                 (gid, uid)
