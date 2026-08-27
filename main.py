@@ -195,7 +195,12 @@ def main():
     asyncio.run(run_bot())
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.info("Bot shutting down...")
+    if os.getenv("RUNNING_SUB_BOT") != "1" and (BASE_DIR / ".env.bot2").exists():
+        from bot import run_multi_bot
+        run_multi_bot()
+    else:
+        try:
+            main()
+        except KeyboardInterrupt:
+            logger.info("Bot shutting down...")
+
