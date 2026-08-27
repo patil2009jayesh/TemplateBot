@@ -27,7 +27,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("TachosDev")
 
-intents = discord.Intents.all()
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+intents.guilds = True
+intents.voice_states = True
+intents.reactions = True
 
 class TachosDevBot(commands.Bot):
     def __init__(self):
@@ -94,8 +99,16 @@ bot = TachosDevBot()
 bot.tree.on_error = bot.on_tree_error
 
 async def main():
-    async with bot:
-        await bot.start(TOKEN)
+    try:
+        async with bot:
+            await bot.start(TOKEN)
+    except discord.errors.PrivilegedIntentsRequired:
+        logger.warning("Privileged Intents are not enabled on Discord Developer Portal! Starting with basic intents fallback...")
+        bot.intents.message_content = False
+        bot.intents.members = False
+        bot.intents.presences = False
+        async with bot:
+            await bot.start(TOKEN)
 
 if __name__ == "__main__":
     try:
