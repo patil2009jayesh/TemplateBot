@@ -18,59 +18,90 @@ class GiveawayView(discord.ui.View):
     def __init__(self, giveaway_id: int):
         super().__init__(timeout=None)
         self.giveaway_id = giveaway_id
+        self.enter_btn.custom_id = f"gw_enter:{giveaway_id}"
 
-    @discord.ui.button(label="Enter Giveaway", style=discord.ButtonStyle.primary, emoji="🎉", custom_id="gw_enter_btn")
+    @discord.ui.button(label="Enter Giveaway", style=discord.ButtonStyle.primary, emoji="🎉")
     async def enter_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Fetch giveaway
-        async with get_db() as db:
-            async with db.execute("SELECT * FROM giveaways WHERE id = ? AND status = 'active'", (self.giveaway_id,)) as cursor:
-                gw = await cursor.fetchone()
-                if not gw:
-                    return await interaction.response.send_message("❌ This giveaway has already ended.", ephemeral=True)
+        await handle_giveaway_entry(interaction, self.giveaway_id)
 
-                # Check minimum invites if required
-                if gw["min_invites"] > 0:
-                    async with db.execute(
-                        "SELECT (invites_count - left_invites - fake_invites) as real_invites FROM invites WHERE guild_id = ? AND user_id = ?",
-                        (str(interaction.guild.id), str(interaction.user.id))
-                    ) as inv_cur:
-                        inv_row = await inv_cur.fetchone()
-                        real_inv = inv_row["real_invites"] if inv_row else 0
-                        if real_inv < gw["min_invites"]:
-                            return await interaction.response.send_message(
-                                f"❌ You need at least **{gw['min_invites']} invites** to enter. You have: **{real_inv}**.",
-                                ephemeral=True
-                            )
+async def handle_giveaway_entry(interaction: discord.Interaction, giveaway_id: int):
+    async with get_db() as db:
+        async with db.execute("SELECT * FROM giveaways WHERE id = ? AND status = 'active'", (giveaway_id,)) as cursor:
+            gw = await cursor.fetchone()
+            if not gw:
+                return await interaction.response.send_message("❌ This giveaway has already ended.", ephemeral=True)
 
-                # Check if already entered
+            try:
+                min_inv = gw["min_invites"]
+            except Exception:
+                min_inv = gw[7] if len(gw) > 7 else 0
+
+            # Check minimum invites if required
+            if min_inv and min_inv > 0:
                 async with db.execute(
-                    "SELECT * FROM giveaway_participants WHERE giveaway_id = ? AND user_id = ?",
-                    (self.giveaway_id, str(interaction.user.id))
-                ) as p_cur:
-                    p = await p_cur.fetchone()
-                    if p:
-                        # Leave giveaway
-                        await db.execute(
-                            "DELETE FROM giveaway_participants WHERE giveaway_id = ? AND user_id = ?",
-                            (self.giveaway_id, str(interaction.user.id))
+                    "SELECT (invites_count - left_invites - fake_invites) as real_invites FROM invites WHERE guild_id = ? AND user_id = ?",
+                    (str(interaction.guild.id), str(interaction.user.id))
+                ) as inv_cur:
+                    inv_row = await inv_cur.fetchone()
+                    try:
+                        real_inv = inv_row["real_invites"] if inv_row else 0
+                    except Exception:
+                        real_inv = inv_row[0] if inv_row else 0
+                    if real_inv < min_inv:
+                        return await interaction.response.send_message(
+                            f"❌ You need at least **{min_inv} invites** to enter. You have: **{real_inv}**.",
+                            ephemeral=True
                         )
-                        await db.commit()
-                        return await interaction.response.send_message("👋 You left the giveaway.", ephemeral=True)
 
-                # Add participant
-                now = datetime.datetime.utcnow().isoformat()
-                await db.execute(
-                    "INSERT INTO giveaway_participants (giveaway_id, user_id, entry_value, timestamp) VALUES (?, ?, 1, ?)",
-                    (self.giveaway_id, str(interaction.user.id), now)
-                )
-                await db.commit()
+            # Check if already entered
+            async with db.execute(
+                "SELECT * FROM giveaway_participants WHERE giveaway_id = ? AND user_id = ?",
+                (giveaway_id, str(interaction.user.id))
+            ) as p_cur:
+                p = await p_cur.fetchone()
+                if p:
+                    # Leave giveaway
+                    await db.execute(
+                        "DELETE FROM giveaway_participants WHERE giveaway_id = ? AND user_id = ?",
+                        (giveaway_id, str(interaction.user.id))
+                    )
+                    await db.commit()
+                    return await interaction.response.send_message("👋 You left the giveaway.", ephemeral=True)
 
-        await interaction.response.send_message("🎉 You entered the giveaway! Good luck!", ephemeral=True)
+            # Add participant
+            now = datetime.datetime.utcnow().isoformat()
+            await db.execute(
+                "INSERT INTO giveaway_participants (giveaway_id, user_id, entry_value, timestamp) VALUES (?, ?, 1, ?)",
+                (giveaway_id, str(interaction.user.id), now)
+            )
+            await db.commit()
+
+    await interaction.response.send_message("🎉 You entered the giveaway! Good luck!", ephemeral=True)
 
 class GiveawayCog(commands.Cog, name="giveaway"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.giveaway_loop.start()
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        custom_id = interaction.data.get("custom_id", "")
+        if custom_id.startswith("gw_enter:"):
+            try:
+                gw_id = int(custom_id.split(":", 1)[1])
+                await handle_giveaway_entry(interaction, gw_id)
+            except Exception as e:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f"❌ Error entering giveaway: {e}", ephemeral=True)
+        elif custom_id == "gw_enter_btn":
+            # Fallback for old giveaway messages
+            async with get_db() as db:
+                async with db.execute("SELECT id FROM giveaways WHERE message_id = ?", (str(interaction.message.id),)) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        await handle_giveaway_entry(interaction, row[0])
 
     def cog_unload(self):
         self.giveaway_loop.cancel()

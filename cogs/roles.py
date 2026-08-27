@@ -135,6 +135,28 @@ class RolesCog(commands.Cog, name="roles"):
         )
 
     @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        custom_id = interaction.data.get("custom_id", "")
+        if custom_id.startswith("btn_role:"):
+            try:
+                role_id = int(custom_id.split(":", 1)[1])
+                role = interaction.guild.get_role(role_id)
+                if not role:
+                    return await interaction.response.send_message("❌ This role no longer exists.", ephemeral=True)
+                
+                if role in interaction.user.roles:
+                    await interaction.user.remove_roles(role, reason="Button role toggle")
+                    await interaction.response.send_message(f"Removed role **{role.name}**.", ephemeral=True)
+                else:
+                    await interaction.user.add_roles(role, reason="Button role toggle")
+                    await interaction.response.send_message(f"Added role **{role.name}**!", ephemeral=True)
+            except Exception as e:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f"❌ Failed to toggle role: {e}", ephemeral=True)
+
+    @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         if not payload.guild_id or payload.user_id == self.bot.user.id:
             return
@@ -149,7 +171,11 @@ class RolesCog(commands.Cog, name="roles"):
         if row:
             guild = self.bot.get_guild(payload.guild_id)
             if guild:
-                role = guild.get_role(int(row["role_id"]))
+                try:
+                    role_id = int(row["role_id"])
+                except Exception:
+                    role_id = int(row[3])
+                role = guild.get_role(role_id)
                 member = guild.get_member(payload.user_id)
                 if role and member and role not in member.roles:
                     try:
@@ -172,7 +198,11 @@ class RolesCog(commands.Cog, name="roles"):
         if row:
             guild = self.bot.get_guild(payload.guild_id)
             if guild:
-                role = guild.get_role(int(row["role_id"]))
+                try:
+                    role_id = int(row["role_id"])
+                except Exception:
+                    role_id = int(row[3])
+                role = guild.get_role(role_id)
                 member = guild.get_member(payload.user_id)
                 if role and member and role in member.roles:
                     try:

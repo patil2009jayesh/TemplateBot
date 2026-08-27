@@ -108,8 +108,10 @@ class TicketActionView(discord.ui.View):
     def __init__(self, ticket_id: int):
         super().__init__(timeout=None)
         self.ticket_id = ticket_id
+        self.claim_btn.custom_id = f"ticket_claim:{ticket_id}"
+        self.close_btn.custom_id = f"ticket_close:{ticket_id}"
 
-    @discord.ui.button(label="Claim Ticket", style=discord.ButtonStyle.primary, emoji="🙋", custom_id="claim_ticket_btn")
+    @discord.ui.button(label="Claim Ticket", style=discord.ButtonStyle.primary, emoji="🙋")
     async def claim_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         async with get_db() as db:
             await db.execute("UPDATE tickets SET staff_id = ? WHERE id = ?", (str(interaction.user.id), self.ticket_id))
@@ -120,7 +122,7 @@ class TicketActionView(discord.ui.View):
         await interaction.response.edit_message(view=self)
         await interaction.channel.send(embed=info_embed(f"Ticket has been claimed by {interaction.user.mention}.", "Ticket Claimed"))
 
-    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒")
     async def close_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(embed=info_embed("Closing ticket and deleting channel in 5 seconds...", "Ticket Closing"))
         async with get_db() as db:
@@ -137,9 +139,10 @@ class TicketPanelButton(discord.ui.View):
     def __init__(self, team_id: int):
         super().__init__(timeout=None)
         self.team_id = team_id
+        self.create_btn.custom_id = f"ticket_open:{team_id}"
 
-    @discord.ui.button(label="Create Ticket", style=discord.ButtonStyle.success, emoji="📩", custom_id="open_ticket_modal_btn")
-    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="Create Ticket", style=discord.ButtonStyle.success, emoji="📩")
+    async def create_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = TicketModal(self.team_id)
         await interaction.response.send_modal(modal)
 
@@ -147,6 +150,59 @@ class TicketsCog(commands.GroupCog, name="ticket"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         super().__init__()
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        """Global persistent listener so ticket buttons NEVER expire across restarts"""
+        if interaction.type != discord.InteractionType.component:
+            return
+        
+        custom_id = interaction.data.get("custom_id", "")
+
+        # Handle persistent ticket open buttons
+        if custom_id.startswith("ticket_open:"):
+            try:
+                team_id = int(custom_id.split(":", 1)[1])
+            except (ValueError, IndexError):
+                team_id = 1
+            await interaction.response.send_modal(TicketModal(team_id))
+
+        elif custom_id == "open_ticket_modal_btn":
+            # Fallback for older panels created before update
+            team_id = 1
+            if interaction.guild:
+                async with get_db() as db:
+                    async with db.execute("SELECT id FROM ticket_teams WHERE guild_id = ? ORDER BY id ASC LIMIT 1", (str(interaction.guild.id),)) as cursor:
+                        row = await cursor.fetchone()
+                        if row:
+                            team_id = row[0]
+            await interaction.response.send_modal(TicketModal(team_id))
+
+        # Handle persistent claim buttons
+        elif custom_id.startswith("ticket_claim:"):
+            try:
+                ticket_id = int(custom_id.split(":", 1)[1])
+                async with get_db() as db:
+                    await db.execute("UPDATE tickets SET staff_id = ? WHERE id = ?", (str(interaction.user.id), ticket_id))
+                    await db.commit()
+                await interaction.response.send_message(embed=info_embed(f"Ticket has been claimed by {interaction.user.mention}.", "Ticket Claimed"))
+            except Exception as e:
+                await interaction.response.send_message(embed=error_embed(f"Could not claim ticket: {e}"), ephemeral=True)
+
+        # Handle persistent close buttons
+        elif custom_id.startswith("ticket_close:"):
+            try:
+                ticket_id = int(custom_id.split(":", 1)[1])
+                await interaction.response.send_message(embed=info_embed("Closing ticket and deleting channel in 5 seconds...", "Ticket Closing"))
+                async with get_db() as db:
+                    await db.execute("UPDATE tickets SET status = 'closed' WHERE id = ?", (ticket_id,))
+                    await db.commit()
+                await discord.utils.sleep_until(discord.utils.utcnow() + discord.utils.datetime.timedelta(seconds=5))
+                if interaction.channel:
+                    await interaction.channel.delete(reason="Ticket closed by user/staff")
+            except Exception as e:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(embed=error_embed(f"Could not close ticket: {e}"), ephemeral=True)
 
     @app_commands.command(name="setup-team", description="Create a support ticket category and staff team")
     @app_commands.describe(name="Team name", staff_role="Role that manages these tickets", category="Category for ticket channels")
