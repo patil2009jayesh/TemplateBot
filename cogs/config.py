@@ -131,7 +131,7 @@ class ConfigCog(commands.Cog, name="config"):
         automod_status = (
             f"• **Module:** {mod_badge('moderation')}\n"
             f"• **Mod Logs:** {ch_repr(channels.get('mod_logs'), '/setchannel type:mod_logs')}\n"
-            f"• **Server Logs:** {ch_repr(channels.get('server_logs'), '/setchannel type:server_logs')}\n"
+            f"• **Server Logs:** {ch_repr(channels.get('server_logs') or channels.get('logging'), '/setchannel type:server_logs')}\n"
             f"• **Anti-Links:** `{'🟢 Enabled' if automod.get('anti_links') else '🔴 Disabled'}` • "
             f"**Anti-Spam:** `{'🟢 Enabled' if automod.get('anti_spam') else '🔴 Disabled'}`\n"
             f"• **Caps Limit:** `{automod.get('caps_limit', 70)}%` • "
@@ -150,7 +150,7 @@ class ConfigCog(commands.Cog, name="config"):
         level_status = (
             f"• **Module:** {mod_badge('leveling')}\n"
             f"• **XP Rate:** `{level_cfg.get('xp_rate', 1.0)}x`\n"
-            f"• **Level-Up Channel:** {ch_repr(channels.get('level_ups'), 'Default: Same Channel')}\n"
+            f"• **Level-Up Channel:** {ch_repr(channels.get('leveling') or channels.get('level_ups'), 'Default: Same Channel')}\n"
             f"• **Level Rewards:** {rewards_text}"
         )
         embed.add_field(name="⭐ 4. Leveling & Role Rewards", value=level_status, inline=False)
@@ -248,28 +248,36 @@ class ConfigCog(commands.Cog, name="config"):
             )
 
     @app_commands.command(name="setchannel", description="Set a dedicated channel for logs, welcome, or leveling")
-    @app_commands.describe(channel_type="Type of log/feature channel", channel="Target channel")
+    @app_commands.describe(channel_type="Type of log/feature channel", channel="Target channel (or omit to reset)")
     @app_commands.choices(channel_type=[
-        app_commands.Choice(name="Logging / Audit Logs", value="logging"),
-        app_commands.Choice(name="Moderation Logs", value="mod_logs"),
+        app_commands.Choice(name="Welcome Channel", value="welcome"),
+        app_commands.Choice(name="Leave / Goodbye Channel", value="leave"),
         app_commands.Choice(name="Leveling Announcements", value="leveling"),
-        app_commands.Choice(name="Welcome Channel", value="welcome")
+        app_commands.Choice(name="Moderation Logs", value="mod_logs"),
+        app_commands.Choice(name="Server / Audit Logs", value="server_logs"),
     ])
     @app_commands.checks.has_permissions(administrator=True)
     async def setchannel(self, interaction: discord.Interaction, channel_type: str, channel: discord.TextChannel = None):
         guild_data = await get_guild(interaction.guild.id)
         channels = guild_data.get("channels", {})
+        
+        # Save both primary and alias keys for full backward compatibility
         channels[channel_type] = str(channel.id) if channel else None
+        if channel_type == "leveling":
+            channels["level_ups"] = str(channel.id) if channel else None
+        elif channel_type == "server_logs":
+            channels["logging"] = str(channel.id) if channel else None
+
         await update_guild(interaction.guild.id, "channels", channels)
 
         if channel:
             await interaction.response.send_message(
-                embed=success_embed(f"Channel for `{channel_type}` set to {channel.mention}."),
+                embed=success_embed(f"Channel for **{channel_type.replace('_', ' ').title()}** set to {channel.mention}."),
                 ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                embed=info_embed(f"Channel for `{channel_type}` removed.", "Channel Reset"),
+                embed=info_embed(f"Channel for **{channel_type.replace('_', ' ').title()}** has been reset.", "Channel Reset"),
                 ephemeral=True
             )
 
