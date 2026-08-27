@@ -44,9 +44,10 @@ class ConfigCog(commands.Cog, name="config"):
             ephemeral=True
         )
 
-    @app_commands.command(name="settings", description="View all server setup stats, active modules, and channel configurations")
+    @app_commands.command(name="settings", description="View a detailed audit of all configured channels, roles, filters, and feature setups")
     @app_commands.checks.has_permissions(administrator=True)
     async def settings_cmd(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         guild_data = await get_guild(guild.id)
         
@@ -55,84 +56,136 @@ class ConfigCog(commands.Cog, name="config"):
         roles = guild_data.get("roles", {})
         settings = guild_data.get("settings", {})
         automod = settings.get("automod", {})
-        
-        # Modules overview
-        mod_list = [
-            f"{'🟢' if modules.get('moderation', True) else '🔴'} **Moderation & AutoMod**",
-            f"{'🟢' if modules.get('leveling', True) else '🔴'} **Leveling & XP**",
-            f"{'🟢' if modules.get('tickets', True) else '🔴'} **Tickets & Support**",
-            f"{'🟢' if modules.get('giveaways', True) else '🔴'} **Giveaways**",
-            f"{'🟢' if modules.get('invites', True) else '🔴'} **Invites Tracking**",
-            f"{'🟢' if modules.get('auto_vc', True) else '🔴'} **Auto-VC (Voice)**",
-            f"{'🟢' if modules.get('welcome', True) else '🔴'} **Welcome System**",
-            f"{'🟢' if modules.get('button_roles', True) else '🔴'} **Button Roles**",
-            f"{'🟢' if modules.get('custom_commands', True) else '🔴'} **Custom Commands**",
-        ]
-        
-        # Channels overview
-        def format_ch(ch_id):
-            if not ch_id:
-                return "*Not Set*"
-            ch = guild.get_channel(int(ch_id))
-            return ch.mention if ch else "*Deleted Channel*"
-            
-        def format_role(role_id):
-            if not role_id:
-                return "*None*"
-            r = guild.get_role(int(role_id))
-            return r.mention if r else "*Deleted Role*"
+        welcome_cfg = settings.get("welcome", {})
+        level_cfg = settings.get("leveling", {})
+        level_rewards = settings.get("level_rewards", {})
 
-        # Fetch database counts
+        def ch_repr(ch_id, hint=""):
+            if not ch_id:
+                return f"⚠️ *Not Configured* {f'(`{hint}`)' if hint else ''}"
+            ch = guild.get_channel(int(ch_id))
+            return f"✅ {ch.mention} (`{ch.id}`)" if ch else f"❌ *Deleted Channel (`{ch_id}`)*"
+
+        def role_repr(role_id, hint=""):
+            if not role_id:
+                return f"⚠️ *Not Configured* {f'(`{hint}`)' if hint else ''}"
+            r = guild.get_role(int(role_id))
+            return f"✅ {r.mention} (`{r.id}`)" if r else f"❌ *Deleted Role (`{role_id}`)*"
+
+        def mod_badge(mod_key):
+            is_on = modules.get(mod_key, True)
+            return "🟢 **ENABLED**" if is_on else "🔴 **DISABLED** (`/module`)"
+
+        # Fetch database details
         async with get_db() as db:
-            async with db.execute("SELECT COUNT(*) FROM tickets WHERE guild_id = ?", (str(guild.id),)) as c1:
-                t_count = (await c1.fetchone())[0]
-            async with db.execute("SELECT COUNT(*) FROM giveaways WHERE guild_id = ? AND status = 'active'", (str(guild.id),)) as c2:
-                gw_count = (await c2.fetchone())[0]
-            async with db.execute("SELECT COUNT(*) FROM custom_commands WHERE guild_id = ?", (str(guild.id),)) as c3:
-                cmd_count = (await c3.fetchone())[0]
-            async with db.execute("SELECT COUNT(*) FROM warnings WHERE guild_id = ?", (str(guild.id),)) as c4:
-                warn_count = (await c4.fetchone())[0]
+            # Ticket teams
+            async with db.execute("SELECT id, team_name, staff_role_id, category_id FROM ticket_teams WHERE guild_id = ?", (str(guild.id),)) as tc:
+                raw_teams = await tc.fetchall()
+            # Active open tickets
+            async with db.execute("SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND status = 'open'", (str(guild.id),)) as otc:
+                open_tickets = (await otc.fetchone())[0]
+            # Active giveaways
+            async with db.execute("SELECT COUNT(*) FROM giveaways WHERE guild_id = ? AND status = 'active'", (str(guild.id),)) as gc:
+                active_gw = (await gc.fetchone())[0]
+            # Custom commands list
+            async with db.execute("SELECT name FROM custom_commands WHERE guild_id = ?", (str(guild.id),)) as ccc:
+                custom_cmds = [r[0] for r in await ccc.fetchall()]
+            # Active temp voice channels
+            async with db.execute("SELECT COUNT(*) FROM auto_vcs WHERE guild_id = ?", (str(guild.id),)) as vc_cur:
+                active_temp_vcs = (await vc_cur.fetchone())[0]
+            # Button & Reaction roles
+            async with db.execute("SELECT COUNT(*) FROM button_roles WHERE guild_id = ?", (str(guild.id),)) as br_cur:
+                btn_roles_count = (await br_cur.fetchone())[0]
+            async with db.execute("SELECT COUNT(*) FROM reaction_roles WHERE guild_id = ?", (str(guild.id),)) as rr_cur:
+                rxn_roles_count = (await rr_cur.fetchone())[0]
 
         embed = discord.Embed(
-            title=f"⚙️ Server Setup & Configuration Dashboard — {guild.name}",
-            description=f"Overview of all active bot modules, configured channels, and live server statistics.\nUse `/module` or `/setchannel` to adjust settings.",
-            color=discord.Color.blurple()
+            title=f"🛠️ Complete Setup Audit & Server Settings — {guild.name}",
+            description=f"Detailed diagnostic report of every command, channel, role, and automated feature.\nBot Status: 🟢 **Active** • Serving `{guild.member_count}` members",
+            color=discord.Color.blue()
         )
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
-            
-        embed.add_field(name="🎛️ Active Modules", value="\n".join(mod_list), inline=False)
-        
-        ch_text = (
-            f"• **Welcome Channel:** {format_ch(channels.get('welcome'))}\n"
-            f"• **Leave Channel:** {format_ch(channels.get('leave'))}\n"
-            f"• **Mod Logs:** {format_ch(channels.get('mod_logs'))}\n"
-            f"• **Server Logs:** {format_ch(channels.get('server_logs'))}\n"
-            f"• **Level-Up Channel:** {format_ch(channels.get('level_ups'))}\n"
-            f"• **Auto-VC Hub:** {format_ch(channels.get('autovc_hub'))}"
+
+        # 1. Auto-VC
+        autovc_ch = channels.get("autovc_hub")
+        autovc_status = (
+            f"• **Module:** {mod_badge('auto_vc')}\n"
+            f"• **Join-To-Create Hub:** {ch_repr(autovc_ch, '/setupvc channel:<voice>')}\n"
+            f"• **Active Temp VCs:** `{active_temp_vcs} currently open`"
         )
-        embed.add_field(name="📌 Configured Channels", value=ch_text, inline=True)
-        
-        prot_text = (
-            f"• **Anti-Spam:** `{'Enabled' if automod.get('anti_spam') else 'Disabled'}`\n"
-            f"• **Anti-Links:** `{'Enabled' if automod.get('anti_links') else 'Disabled'}`\n"
-            f"• **Caps Limit:** `{automod.get('caps_limit', 70)}%`\n"
-            f"• **Mention Limit:** `{automod.get('mention_limit', 5)}`\n"
-            f"• **Auto-Role:** {format_role(roles.get('autorole'))}"
+        embed.add_field(name="🔊 1. Auto-VC (Join-To-Create)", value=autovc_status, inline=False)
+
+        # 2. Welcome & Autorole
+        welcome_msg = welcome_cfg.get("message", "Welcome {user} to {server}!")
+        welcome_status = (
+            f"• **Module:** {mod_badge('welcome')}\n"
+            f"• **Welcome Channel:** {ch_repr(channels.get('welcome'), '/setchannel type:welcome')}\n"
+            f"• **Leave Channel:** {ch_repr(channels.get('leave'), '/setchannel type:leave')}\n"
+            f"• **Auto-Role on Join:** {role_repr(roles.get('autorole'), '/setautorole role:<role>')}\n"
+            f"• **Welcome Template:** *\"{welcome_msg[:80]}{'...' if len(welcome_msg) > 80 else ''}\"*"
         )
-        embed.add_field(name="🛡️ Protection & Roles", value=prot_text, inline=True)
-        
-        stat_text = (
-            f"• **Total Tickets:** `{t_count}`\n"
-            f"• **Active Giveaways:** `{gw_count}`\n"
-            f"• **Custom Commands:** `{cmd_count}`\n"
-            f"• **Warnings Logged:** `{warn_count}`\n"
-            f"• **Server Members:** `{guild.member_count}`"
+        embed.add_field(name="👋 2. Welcome & Onboarding System", value=welcome_status, inline=False)
+
+        # 3. AutoMod & Logging
+        automod_status = (
+            f"• **Module:** {mod_badge('moderation')}\n"
+            f"• **Mod Logs:** {ch_repr(channels.get('mod_logs'), '/setchannel type:mod_logs')}\n"
+            f"• **Server Logs:** {ch_repr(channels.get('server_logs'), '/setchannel type:server_logs')}\n"
+            f"• **Anti-Links:** `{'🟢 Enabled' if automod.get('anti_links') else '🔴 Disabled'}` • "
+            f"**Anti-Spam:** `{'🟢 Enabled' if automod.get('anti_spam') else '🔴 Disabled'}`\n"
+            f"• **Caps Limit:** `{automod.get('caps_limit', 70)}%` • "
+            f"**Max Mentions:** `{automod.get('mention_limit', 5)} pings`"
         )
-        embed.add_field(name="📊 Server Stats", value=stat_text, inline=False)
-        embed.set_footer(text="Tachos Dev • Configuration Manager", icon_url=self.bot.user.display_avatar.url if self.bot.user else None)
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        embed.add_field(name="🛡️ 3. AutoMod & Server Logs", value=automod_status, inline=False)
+
+        # 4. Leveling & Rewards
+        rewards_formatted = []
+        if level_rewards:
+            for lvl, r_id in sorted(level_rewards.items(), key=lambda x: int(x[0])):
+                role_obj = guild.get_role(int(r_id))
+                rewards_formatted.append(f"Level {lvl} ➡️ {role_obj.mention if role_obj else 'Deleted'}")
+        rewards_text = ", ".join(rewards_formatted) if rewards_formatted else "⚠️ *No role rewards configured (`/levelreward`)*"
+
+        level_status = (
+            f"• **Module:** {mod_badge('leveling')}\n"
+            f"• **XP Rate:** `{level_cfg.get('xp_rate', 1.0)}x`\n"
+            f"• **Level-Up Channel:** {ch_repr(channels.get('level_ups'), 'Default: Same Channel')}\n"
+            f"• **Level Rewards:** {rewards_text}"
+        )
+        embed.add_field(name="⭐ 4. Leveling & Role Rewards", value=level_status, inline=False)
+
+        # 5. Tickets System
+        teams_formatted = []
+        if raw_teams:
+            for t in raw_teams:
+                t_id, t_name, s_role_id, cat_id = t[0], t[1], t[2], t[3]
+                s_role = guild.get_role(int(s_role_id)) if s_role_id else None
+                cat = guild.get_channel(int(cat_id)) if cat_id else None
+                teams_formatted.append(f"• **Team #{t_id} ({t_name})**: Staff {s_role.mention if s_role else 'None'} | Category: `{cat.name if cat else 'None'}`")
+            teams_text = "\n".join(teams_formatted)
+        else:
+            teams_text = "⚠️ *No ticket teams created yet (`/ticket setup-team`)*"
+
+        ticket_status = (
+            f"• **Module:** {mod_badge('tickets')}\n"
+            f"• **Configured Teams:**\n{teams_text}\n"
+            f"• **Active Open Tickets:** `{open_tickets} currently open`"
+        )
+        embed.add_field(name="🎫 5. Interactive Ticket System", value=ticket_status, inline=False)
+
+        # 6. Self-Roles, Giveaways & Custom Commands
+        cmd_preview = ", ".join(f"`!{c}`" for c in custom_cmds[:8]) if custom_cmds else "*None created (`/addcmd`)*"
+        extra_status = (
+            f"• **Button Role Panels:** `{btn_roles_count} active panels` (`/buttonrole`)\n"
+            f"• **Reaction Role Binds:** `{rxn_roles_count} active binds` (`/reactionrole`)\n"
+            f"• **Active Giveaways:** `{active_gw} giveaways running` (`/giveaway`)\n"
+            f"• **Custom Prefix Commands:** {cmd_preview}"
+        )
+        embed.add_field(name="🎁 6. Self-Roles, Giveaways & Commands", value=extra_status, inline=False)
+
+        embed.set_footer(text="Tachos Dev • Use any slash command to configure unconfigured features", icon_url=self.bot.user.display_avatar.url if self.bot.user else None)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="setautomod", description="Configure AutoMod protection filters")
     @app_commands.describe(
